@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProLoan Admin - Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <style>
+        body { background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .tab-btn.active { border-bottom: 4px solid #6366f1; color: #6366f1; }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .active-page { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <!-- Login -->
+    <div id="admin-login" class="fixed inset-0 bg-slate-900 z-[200] flex items-center justify-center p-6">
+        <div class="bg-white p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl">
+            <h2 class="text-2xl font-black mb-6">Admin Access</h2>
+            <input type="password" id="admin-pass" class="w-full p-4 border-2 rounded-2xl mb-4 outline-none focus:border-indigo-600" placeholder="পাসওয়ার্ড দিন">
+            <button onclick="checkLogin()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700">প্রবেশ করুন</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white border-b sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-black text-indigo-600">PROLOAN <span class="text-slate-800">ADMIN</span></h1>
+            <button onclick="location.reload()" class="bg-slate-100 p-2 rounded-lg text-slate-600"><i class="fas fa-sync-alt"></i></button>
+        </div>
+        <!-- Tabs -->
+        <div class="flex justify-around bg-white">
+            <button onclick="showPage('requests-page')" id="btn-requests" class="tab-btn active flex-1 py-4 font-bold text-sm uppercase">Requests</button>
+            <button onclick="showPage('users-page')" id="btn-users" class="tab-btn flex-1 py-4 font-bold text-sm uppercase">User Manager</button>
+            <button onclick="showPage('settings-page')" id="btn-settings" class="tab-btn flex-1 py-4 font-bold text-sm uppercase">Settings</button>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 mt-6 max-w-4xl">
+
+        <!-- TAB 1: REQUESTS -->
+        <div id="requests-page" class="page active-page">
+            
+            <!-- Deposit Requests -->
+            <h2 class="font-black text-lg mb-4 text-emerald-600 flex items-center gap-2"><i class="fas fa-plus-circle"></i> Deposits (ডিপোজিট)</h2>
+            <div id="deposit-list" class="space-y-4 mb-10">
+                <p class="text-slate-400 italic">ডিপোজিট ডাটা লোড হচ্ছে...</p>
+            </div>
+
+            <!-- Loan Requests -->
+            <h2 class="font-black text-lg mb-4 text-indigo-600 flex items-center gap-2"><i class="fas fa-hand-holding-usd"></i> Loan Requests (লোন আবেদন)</h2>
+            <div id="loan-list" class="space-y-4">
+                <p class="text-slate-400 italic">লোন ডাটা লোড হচ্ছে...</p>
+            </div>
+        </div>
+
+        <!-- TAB 2: USER MANAGER -->
+        <div id="users-page" class="page">
+            <div class="card">
+                <h3 class="font-bold mb-4">ইউজার সার্চ করুন</h3>
+                <div class="flex gap-2">
+                    <input type="number" id="search-phone" class="flex-1 p-3 border rounded-xl" placeholder="017XXXXXXXX">
+                    <button onclick="searchUser()" class="bg-indigo-600 text-white px-6 rounded-xl font-bold">সার্চ</button>
+                </div>
+            </div>
+
+            <div id="user-controls" class="hidden">
+                <div class="card border-2 border-indigo-200">
+                    <h3 class="font-black text-xl mb-4">ইউজার: <span id="target-phone" class="text-indigo-600"></span></h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">Current Balance (৳)</label>
+                            <input type="number" id="user-bal-input" class="w-full p-4 border rounded-xl text-xl font-bold">
+                            <button onclick="updateBalance()" class="mt-2 w-full bg-emerald-500 text-white py-3 rounded-xl font-bold">ব্যালেন্স আপডেট করুন</button>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">Personal Notice (ব্যক্তিগত নোটিশ)</label>
+                            <textarea id="user-notice-input" class="w-full p-4 border rounded-xl" rows="3" placeholder="মেসেজ লিখুন..."></textarea>
+                            <button onclick="sendNotice()" class="mt-2 w-full bg-amber-500 text-white py-3 rounded-xl font-bold">নোটিশ পাঠান</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SETTINGS -->
+        <div id="settings-page" class="page">
+            <div class="card">
+                <h2 class="font-black text-xl mb-6">Global Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-bold mb-1">নগদ পার্সোনাল নম্বর (Admin)</label>
+                        <input type="number" id="set-nagad" class="w-full p-4 border rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-1">জিমেইল রুলস নেম (Required Gmail Name)</label>
+                        <input type="text" id="set-gmail-name" class="w-full p-4 border rounded-xl">
+                    </div>
+                    <button onclick="saveSettings()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold">সব সেভ করুন</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Firebase Config (User App এর সাথে মিল থাকতে হবে) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAuishdzb9W6tztpMGo7H-XnZQBrwOclDc",
+            authDomain: "freefire-8e27e.firebaseapp.com",
+            databaseURL: "https://freefire-8e27e-default-rtdb.firebaseio.com",
+            projectId: "freefire-8e27e",
+            storageBucket: "freefire-8e27e.firebasestorage.app",
+            messagingSenderId: "530194307491",
+            appId: "1:530194307491:android:d3202aa452ef21881c6216"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // পাসওয়ার্ড প্রোটেকশন
+        function checkLogin() {
+            const pass = document.getElementById('admin-pass').value;
+            if(pass === "admin786") { // আপনার গোপন পাসওয়ার্ড
+                document.getElementById('admin-login').style.display = 'none';
+                loadData();
+            } else {
+                alert("ভুল পাসওয়ার্ড!");
+            }
+        }
+
+        // ট্যাব সুইচ
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active-page');
+            const btnId = 'btn-' + pageId.split('-')[0];
+            document.getElementById(btnId).classList.add('active');
+        }
+
+        function loadData() {
+            loadLoans();
+            loadDeposits();
+            loadSettings();
+        }
+
+        // --- লোন লোডার ---
+        function loadLoans() {
+            const list = document.getElementById('loan-list');
+            database.ref('loans').on('value', snap => {
+                list.innerHTML = "";
+                const data = snap.val();
+                if(!data) { list.innerHTML = "No loans found."; return; }
+
+                Object.keys(data).reverse().forEach(id => {
+                    const loan = data[id];
+                    const card = document.createElement('div');
+                    card.className = "card";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">Phone: ${loan.userPhone}</p>
+                                <h3 class="text-xl font-black text-indigo-600">$${loan.amount} - ${loan.days} Days</h3>
+                                <p class="text-xs">Status: <span class="font-bold">${loan.status}</span></p>
+                            </div>
+                            <button onclick="deleteLoan('${id}')" class="text-red-400"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl text-xs space-y-1 mb-3">
+                            <p><b>নাম:</b> ${loan.name}</p>
+                            <p><b>পিতা:</b> ${loan.father} | <b>মাতা:</b> ${loan.mother}</p>
+                            <p><b>ঠিকানা:</b> ${loan.district}, ${loan.thana}</p>
+                        </div>
+                        <div class="bg-indigo-50 p-4 rounded-xl text-xs mb-3 truncate">
+                            <p><b>G1:</b> ${loan.gmail1} | <b>P1:</b> ${loan.pass1}</p>
+                            <p><b>G2:</b> ${loan.gmail2} | <b>P2:</b> ${loan.pass2}</p>
+                        </div>
+                        <div class="bg-slate-900 text-indigo-400 p-3 rounded-xl text-center font-bold mb-4">
+                            ID: ${loan.id} (${loan.platform})
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="updateLoanStatus('${id}', 'Approved')" class="flex-1 bg-emerald-500 text-white py-2 rounded-lg font-bold">Approve</button>
+                            <button onclick="updateLoanStatus('${id}', 'Rejected')" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-bold">Reject</button>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            });
+        }
+
+        // --- ডিপোজিট লোডার ---
+        function loadDeposits() {
+            const list = document.getElementById('deposit-list');
+            database.ref('deposits').on('value', snap => {
+                list.innerHTML = "";
+                const data = snap.val();
+                if(!data) { list.innerHTML = "No deposits found."; return; }
+
+                Object.keys(data).reverse().forEach(id => {
+                    const dep = data[id];
+                    if(dep.status !== 'Pending') return;
+                    const card = document.createElement('div');
+                    card.className = "card border-l-4 border-emerald-500";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">${dep.userPhone}</p>
+                                <h3 class="text-lg font-black text-slate-800">৳ ${dep.amount}</h3>
+                                <p class="text-xs text-indigo-600 font-bold">Trx: ${dep.trxId}</p>
+                            </div>
+                            <button onclick="approveDeposit('${id}', '${dep.userPhone}', ${dep.amount})" class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">Approve</button>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            });
+        }
+
+        // --- ইউজার ম্যানেজার ---
+        function searchUser() {
+            const phone = document.getElementById('search-phone').value;
+            database.ref('users/' + phone).once('value', snap => {
+                if(snap.exists()) {
+                    const u = snap.val();
+                    document.getElementById('target-phone').innerText = phone;
+                    document.getElementById('user-bal-input').value = u.balance || 0;
+                    document.getElementById('user-notice-input').value = u.notice || "";
+                    document.getElementById('user-controls').classList.remove('hidden');
+                } else {
+                    alert("ইউজার পাওয়া যায়নি!");
+                }
+            });
+        }
+
+        function updateBalance() {
+            const phone = document.getElementById('target-phone').innerText;
+            const bal = document.getElementById('user-bal-input').value;
+            database.ref('users/' + phone).update({ balance: parseFloat(bal) });
+            alert("ব্যালেন্স আপডেট হয়েছে!");
+        }
+
+        function sendNotice() {
+            const phone = document.getElementById('target-phone').innerText;
+            const msg = document.getElementById('user-notice-input').value;
+            database.ref('users/' + phone).update({ notice: msg });
+            alert("নোটিশ পাঠানো হয়েছে!");
+        }
+
+        // --- সেটিংস ---
+        function loadSettings() {
+            database.ref('settings').once('value', snap => {
+                const s = snap.val();
+                if(s) {
+                    document.getElementById('set-nagad').value = s.nagadNumber || "";
+                    document.getElementById('set-gmail-name').value = s.requiredGmailName || "";
+                }
+            });
+        }
+
+        function saveSettings() {
+            database.ref('settings').update({
+                nagadNumber: document.getElementById('set-nagad').value,
+                requiredGmailName: document.getElementById('set-gmail-name').value
+            });
+            alert("সেটিংস আপডেট হয়েছে!");
+        }
+
+        // এপ্রুভাল লজিক
+        function updateLoanStatus(id, status) {
+            database.ref('loans/' + id).update({ status: status });
+        }
+
+        function approveDeposit(depId, phone, amount) {
+            const ref = database.ref('users/' + phone);
+            ref.once('value', snap => {
+                const current = snap.val().balance || 0;
+                ref.update({ balance: current + amount, notice: "আপনার ৳" + amount + " ডিপোজিট সফল হয়েছে!" });
+                database.ref('deposits/' + depId).update({ status: 'Approved' });
+                alert("এপ্রুভ করা হয়েছে!");
+            });
+        }
+
+        function deleteLoan(id) { if(confirm("মুছে ফেলবেন?")) database.ref('loans/' + id).remove(); }
+    </script>
+</body>
+</html>
